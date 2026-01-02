@@ -9,13 +9,11 @@
 
 class Camera {
     public:
-    Camera(int id, Notification *n);
-    void captureFrame();
-    cv::Mat getFrame();
-    int getIdDevice();
-    virtual ~Camera();
-
-
+        Camera(int id, Notification *n);
+        void captureFrame();
+        cv::Mat get_frame();
+        int get_idDevice();
+        virtual ~Camera();
 
     private:
         std::vector< int > params = {

@@ -22,17 +22,18 @@ void Camera::captureFrame(){
     }
 }
 
-cv::Mat Camera::getFrame(){
+cv::Mat Camera::get_frame(){
     if (frame.empty()){
          notif->notice_err("Captured empty frame from camera with id: " + std::to_string(id_device));
     }
     return frame;
 }
 
-int Camera::getIdDevice(){
+int Camera::get_idDevice(){
     return id_device;
 }
 
 Camera::~Camera(){
     camera.release();
+    delete notif;
 }
