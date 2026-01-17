@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 3.28)
+
+project(Car_identification_OCR)
+
+set(sources cpp_file/main.cpp .......)#indiquer les fichiers .cpp
+
+set(headers cpp_file/Ai.hpp .......)#indiquer les fichier .hpp
+
+# Set the C++ standard to C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_PREFIX_PATH path__/libtorch)
+
+add_executable(cao ${sources} ${headers})
+
+find_package(OpenCV REQUIRED)
+
+find_package(Torch REQUIRED)
+
+target_include_directories(cao PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/hpp_file" ${OpenCV_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS})
+
+target_link_directories(cao ${OpenCV_LIBS} ${TORCH_LIBRARIES})
+
+
