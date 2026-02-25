@@ -21,6 +21,7 @@ class Image{
         void save_plateInfo();
         void set_plateCoord(std::vector <cv::Rect> coord);
         void set_plateOcr(std::string ocr);
+        void set_plateCoordScore(std::vector <float> score);
         cv::Mat get_frame();
         std::string get_id();
 
@@ -30,6 +31,7 @@ class Image{
         cv::Mat image_frame;
         std::vector <cv::Mat> plate_frame;
         std::vector <cv::Rect> plate_coord;
+        std::vector <float> plate_coord_score;
         std::vector <std::string> plate_ocr;
         std::string image_id;
         std::string folder_name;

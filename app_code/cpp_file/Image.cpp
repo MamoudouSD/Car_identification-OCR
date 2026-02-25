@@ -28,7 +28,7 @@ void Image::set_frame(cv::Mat img, const int camera_id){
         notif->notice_err("Image color convertion ERROR: img is empty");
     }else{
         nb++;
-        cv::cvtColor(img, image_frame, cv::COLOR_RGBA2RGB);
+        cv::cvtColor(img, image_frame, cv::COLOR_BGR2RGB);
         set_imageName(camera_id);
     }
 }
@@ -45,6 +45,11 @@ void Image::set_plateCoord(std::vector <cv::Rect> coord){
     plate_coord = coord;
     reframe();
     
+}
+
+//changera en fonction de ce que retournera AI
+void Image::set_plateCoordScore(std::vector <float> score){
+    plate_coord_score = score;
 }
 
 void Image::save_frame(){
