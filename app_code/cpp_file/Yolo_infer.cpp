@@ -6,7 +6,7 @@ Yolo_infer::Yolo_infer(std::string path, Notification* n, float scoreThreshold, 
 }
 
 int Yolo_infer::load_model(){
-    module = new Module("/Users/mamoudousdiani/Documents/projet_AI-SE/CODE/Car_identification-OCR/AI/model_quantified_executorch.pte");
+    module = new Module(model_path);
     auto r = module->load();
     if (r != executorch::runtime::Error::Ok) {
         notif->notice_err("Yolo loading failed: model load failed!");
