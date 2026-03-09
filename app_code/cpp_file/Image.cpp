@@ -41,15 +41,13 @@ void Image::set_imageName(const int camera_id){
 }
 
 //changera en fonction de ce que retournera AI
-void Image::set_plateCoord(std::vector <cv::Rect> coord){
-    plate_coord = coord;
-    reframe();
-    
+void Image::set_plateCoord(cv::Rect coord){
+    plate_coord.push_back(coord);    
 }
 
 //changera en fonction de ce que retournera AI
-void Image::set_plateCoordScore(std::vector <float> score){
-    plate_coord_score = score;
+void Image::set_plateCoordScore(float score){
+    plate_coord_score.push_back(score);
 }
 
 void Image::save_frame(){
@@ -73,7 +71,7 @@ void Image::reframe(){
         cv::Mat plate_resize;
         for (int i =0; i<plate_coord.size(); i++){
             plate = image_frame(plate_coord[i]);
-            cv::resize(plate, plate_resize,cv::Size(384, 384), 100.0, 100.0, cv::INTER_LANCZOS4);
+            cv::resize(plate, plate_resize,cv::Size(240, 320), 100.0, 100.0, cv::INTER_LANCZOS4);
             plate_frame.push_back (plate_resize);
         }
     }

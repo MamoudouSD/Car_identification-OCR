@@ -19,9 +19,9 @@ class Image{
         void reframe();
         void save_frame();
         void save_plateInfo();
-        void set_plateCoord(std::vector <cv::Rect> coord);
+        void set_plateCoord(cv::Rect coord);
         void set_plateOcr(std::string ocr);
-        void set_plateCoordScore(std::vector <float> score);
+        void set_plateCoordScore(float score);
         cv::Mat get_frame();
         std::string get_id();
 

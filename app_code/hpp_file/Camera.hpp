@@ -15,6 +15,7 @@ class Camera {
         int get_idDevice();
         virtual ~Camera();
 
+        
     private:
         std::vector< int > params = {
             cv::CAP_PROP_FRAME_WIDTH, 640,

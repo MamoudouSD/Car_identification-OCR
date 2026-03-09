@@ -1,9 +1,12 @@
 #ifndef DISPLAY_HPP
 #define DISPLAY_HPP
+#endif
 
 #include <stdint.h>
 #include <chrono>
 #include <thread>
+#include <opencv2/opencv.hpp>
+
 
 
 #define GPFSEL0     (uint32_t *)0x7e200000
@@ -59,11 +62,16 @@
 #define CMD_INTERFMODECTRL ((uint32_t)0x00B0)
 #define PARAM_INTERFMODECTRL ((uint32_t)0x0080)
 
-
+static inline void wr_strobe();
+static inline void write_bus(uint32_t value);
+static inline void write_data(uint32_t value);
+static inline void write_command(uint32_t cmd);
+static inline void end_data_stream();
 void gpio_init();
-void send_data(uint32_t cmd, uint32_t *data, int length);
+void send_configData(uint32_t cmd, uint32_t *data, int length);
 void display_init();
 void fill_color(uint32_t color);
 void fill_screen(uint32_t color1, uint32_t color2);
 
-#endif
+void fill_image(cv::Mat image, int part);
+
