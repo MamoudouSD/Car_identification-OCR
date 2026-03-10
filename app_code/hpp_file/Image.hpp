@@ -22,12 +22,13 @@ class Image{
         void set_plateCoord(cv::Rect coord);
         void set_plateOcr(std::string ocr);
         void set_plateCoordScore(float score);
+        void set_nb(int n);
         cv::Mat get_frame();
-        std::string get_id();
+        std::string get_idImage();
 
 
     private:
-        void create_folder(std::string p);
+        bool create_folder(std::string p);
         cv::Mat image_frame;
         std::vector <cv::Mat> plate_frame;
         std::vector <cv::Rect> plate_coord;

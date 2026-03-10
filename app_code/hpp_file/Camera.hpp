@@ -2,14 +2,17 @@
 #define CAMERA_HPP
 #endif
 
+#include "Notification.hpp"
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <string>
-#include "Notification.hpp"
+
 
 class Camera {
     public:
-        Camera(int id, Notification *n);
+        Camera(Notification *n);
+        bool cam_init(int id);
+        void set_idDevice(int id);
         void captureFrame();
         cv::Mat get_frame();
         int get_idDevice();

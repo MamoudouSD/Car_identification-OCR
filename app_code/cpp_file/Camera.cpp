@@ -1,13 +1,22 @@
 #include "Camera.hpp"
 
-Camera::Camera(int id, Notification *n){
-    id_device=id;
+Camera::Camera(Notification *n){
     notif = n;
+}
+
+void Camera::set_idDevice(int id){
+    id_device = id;
+}
+
+bool Camera::cam_init(int id){
+    set_idDevice(id);
     bool result = camera.open(id_device, api_preference, params);
     if (result == false){
         notif->notice_err("Error opening camera with id: " + std::to_string(id_device));
+        return false;
     } else {
         notif->notice_info("Camera with id: " + std::to_string(id_device) + " opened successfully");
+        return true;
     }
 }
 

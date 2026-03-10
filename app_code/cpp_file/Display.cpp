@@ -86,7 +86,11 @@ void display_init(){
 
     fill_screen(BLUE, RED);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    fill_screen(GREEN, GREEN);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
 }
 
@@ -134,3 +138,4 @@ void fill_image(cv::Mat image, int part){
     }
     end_data_stream();
 }
+

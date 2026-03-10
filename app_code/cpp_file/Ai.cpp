@@ -7,3 +7,4 @@ Ai::Ai(std::string path, Notification* n){
 
 Ai::~Ai(){
 }
+

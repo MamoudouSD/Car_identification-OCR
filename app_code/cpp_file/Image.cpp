@@ -8,26 +8,32 @@ Image::Image( Notification *n){
     time_t timestamp;
     time(&timestamp);
     folder_name = ctime(&timestamp);
-    folder_name = string_cleang(folder_name);
-    folder_name = image_id.substr(0, 10)+ "_" + image_id.substr(20, image_id.size());
-    create_folder(annexe+"/"+folder_name);
-    write_file(annexe+"/"+folder_name+"/"+folder_name+".txt", "id;number_of_plate;plate_coordinates;plate_ocr\n");
+    folder_name = string_clean(folder_name);
+    folder_name = folder_name.substr(0, 10)+ "_" + folder_name.substr(20, folder_name.size());
+    if (create_folder(annexe+"/"+folder_name)){
+        write_file(annexe+"/"+folder_name+"/"+folder_name+".txt", "id;number_of_plate;plate_coordinates;plate_ocr\n");
+    }
 }
 
-void Image::create_folder(std::string p){
+bool Image::create_folder(std::string p){
     if (std::filesystem::exists(std::filesystem::path (p))){
         notif->notice_info(p + " folder already exist");
+        return false;
     }else{
         create_directory( std::filesystem::path(p));
         notif->notice_info(p + " folder created");
+        return true;
     }
+}
+
+void Image::set_nb(int n){
+    nb = n;
 }
 
 void Image::set_frame(cv::Mat img, const int camera_id){
     if (img.empty()) {
         notif->notice_err("Image color convertion ERROR: img is empty");
     }else{
-        nb++;
         cv::cvtColor(img, image_frame, cv::COLOR_BGR2RGB);
         set_imageName(camera_id);
     }
@@ -36,7 +42,7 @@ void Image::set_imageName(const int camera_id){
     time_t timestamp;
     time(&timestamp);
     image_id = ctime(&timestamp);
-    image_id = string_cleang(image_id);
+    image_id = string_clean(image_id);
     image_id = std::to_string(camera_id) + "_" + image_id + "_" + std::to_string(nb);
 }
 
@@ -106,7 +112,7 @@ void Image::save_plateInfo(){
 cv::Mat Image::get_frame(){
     return image_frame;
 }
-std::string Image::get_id(){
+std::string Image::get_idImage(){
     return image_id;
 }
 
@@ -115,7 +121,7 @@ void Image::set_plateOcr(std::string ocr){
 }
 
 namespace {
-    std::string string_cleang(std::string& s) {
+    std::string string_clean(std::string& s) {
         // Logique de découpe ou mise en forme
         while(s.find(" ") < s.length()){
             s[s.find(" ")] = '_';
