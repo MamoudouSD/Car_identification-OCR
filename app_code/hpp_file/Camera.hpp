@@ -13,7 +13,7 @@ class Camera {
         Camera(Notification *n);
         bool cam_init(int id);
         void set_idDevice(int id);
-        void captureFrame();
+        bool captureFrame();
         cv::Mat get_frame();
         int get_idDevice();
         virtual ~Camera();

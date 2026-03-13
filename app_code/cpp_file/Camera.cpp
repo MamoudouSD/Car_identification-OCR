@@ -20,15 +20,18 @@ bool Camera::cam_init(int id){
     }
 }
 
-void Camera::captureFrame(){
+bool Camera::captureFrame(){
     if (!camera.isOpened()){
         notif->notice_err("Camera with id: " + std::to_string(id_device) + " is not opened");
+        return false;
     }else {
         camera.read(frame);
         if (frame.empty()){
             notif->notice_err("Captured empty frame from camera with id: " + std::to_string(id_device));
+            return false;
         }
     }
+    return true;
 }
 
 cv::Mat Camera::get_frame(){
@@ -44,5 +47,4 @@ int Camera::get_idDevice(){
 
 Camera::~Camera(){
     camera.release();
-    delete notif;
 }

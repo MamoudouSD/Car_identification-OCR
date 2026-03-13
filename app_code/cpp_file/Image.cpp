@@ -2,8 +2,9 @@
 
 //annexe path : ./annexe
 //folder_name: Weekday_M_d_y exp Sat_Jan_10_2026
-Image::Image( Notification *n){
+Image::Image( Notification *n, int number){
     notif = n;
+    nb = number;
     create_folder(annexe);
     time_t timestamp;
     time(&timestamp);
@@ -11,7 +12,7 @@ Image::Image( Notification *n){
     folder_name = string_clean(folder_name);
     folder_name = folder_name.substr(0, 10)+ "_" + folder_name.substr(20, folder_name.size());
     if (create_folder(annexe+"/"+folder_name)){
-        write_file(annexe+"/"+folder_name+"/"+folder_name+".txt", "id;number_of_plate;plate_coordinates;plate_ocr\n");
+        write_file(annexe+"/"+folder_name+"/"+folder_name+".txt", "id;number_of_plate;plate_coordinates\n");
     }
 }
 
@@ -26,17 +27,17 @@ bool Image::create_folder(std::string p){
     }
 }
 
-void Image::set_nb(int n){
-    nb = n;
-}
 
-void Image::set_frame(cv::Mat img, const int camera_id){
+bool Image::set_frame(cv::Mat img, const int camera_id){
     if (img.empty()) {
         notif->notice_err("Image color convertion ERROR: img is empty");
+        return false;
     }else{
         cv::cvtColor(img, image_frame, cv::COLOR_BGR2RGB);
+        cam_id= camera_id;
         set_imageName(camera_id);
     }
+    return true;
 }
 void Image::set_imageName(const int camera_id){
     time_t timestamp;
@@ -48,7 +49,7 @@ void Image::set_imageName(const int camera_id){
 
 //changera en fonction de ce que retournera AI
 void Image::set_plateCoord(cv::Rect coord){
-    plate_coord.push_back(coord);    
+    plate_coord.push_back(coord);
 }
 
 //changera en fonction de ce que retournera AI
@@ -92,33 +93,32 @@ void Image::save_plateInfo(){
                             +";("+std::to_string(plate_coord[0].x)+","
                             +std::to_string(plate_coord[0].y)+","+std::to_string(plate_coord[0].width)+","
                             +std::to_string(plate_coord[0].height)+")";
-        
         for (int i =1; i< plate_coord.size(); i++){
             message +=",";
             message += "("+std::to_string(plate_coord[i].x)+","+std::to_string(plate_coord[i].y)+","+std::to_string(plate_coord[i].width)
                     +","+std::to_string(plate_coord[i].height)+")";
-        }
-
-        message += ";"+plate_ocr[0];
-        for (int i=1; i<plate_ocr.size(); i++){
-            message += ",";
-            message += plate_ocr[i];
         }
         message += "\n";
     }
     write_file(annexe+"/"+folder_name+"/"+folder_name+".txt", message);
 }
 
-cv::Mat Image::get_frame(){
+const cv::Mat Image::get_frame(){
     return image_frame;
 }
-std::string Image::get_idImage(){
+const std::string Image::get_idImage(){
     return image_id;
 }
 
-void Image::set_plateOcr(std::string ocr){
-    plate_ocr.push_back(ocr);
+const int Image::get_camId(){
+    return cam_id;
 }
+
+std::vector<cv::Mat> Image::get_plateFrame(){
+    return plate_frame;
+}
+
+
 
 namespace {
     std::string string_clean(std::string& s) {
