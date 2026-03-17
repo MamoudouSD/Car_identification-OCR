@@ -1,7 +1,6 @@
 #ifndef YOLO_INFER_HPP
 #define YOLO_INFER_HPP
 #endif
-
 #include "Ai.hpp"
 
 struct Detection{

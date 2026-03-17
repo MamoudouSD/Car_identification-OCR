@@ -7,22 +7,21 @@
 #include "Camera.hpp"
 #include "Image.hpp"
 #include "Notification.hpp"
+#include <queue>
+#include <atomic>
+#include <semaphore>
+#include <thread>
+#include <pthread.h>
+#include "ThreadSafe_queue.hpp"
 
 
-extern Notification notif;
-extern Camera cam1;
-extern Camera cam2;
-extern Ai* yolo = nullptr;
-extern int nb;
-extern std::queue<Image> img_toAi;
-extern std::queue<Image> img_toDisplay;
-extern std::queue<Image> img_toSave;
 
 
-int system_init();
-bool capture(Camera& cam);
-bool inference(Ai* model);
+bool system_init();
+void capture(Camera& cam);
+void inference(Ai* model);
 void screen();
 void save();
+void sequencer();
 int start();
 int system_end();
