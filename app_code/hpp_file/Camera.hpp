@@ -1,11 +1,8 @@
 #ifndef CAMERA_HPP
 #define CAMERA_HPP
-#endif
-
 #include "Notification.hpp"
 #include <opencv2/opencv.hpp>
 #include <vector>
-#include <string>
 
 
 class Camera {
@@ -13,7 +10,7 @@ class Camera {
         Camera(Notification *n);
         bool cam_init(int id);
         void set_idDevice(int id);
-        bool captureFrame();
+        bool capture_frame();
         cv::Mat get_frame();
         int get_idDevice();
         virtual ~Camera();
@@ -30,3 +27,5 @@ class Camera {
         cv::Mat frame;
         int api_preference = cv::CAP_ANY;
 };
+#endif
+

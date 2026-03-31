@@ -1,4 +1,27 @@
 #include "Image.hpp"
+#include <filesystem>
+#include <fstream>
+
+namespace {
+    std::string string_clean(std::string& s) {
+        // Logique de découpe ou mise en forme
+        while(s.find(" ") < s.length()){
+            s[s.find(" ")] = '_';
+        }
+        while(s.find(":") < s.length()){
+            s[s.find(":")] = '-';
+        }
+        return s.substr(0, s.size()-1);
+    }
+
+    void write_file(std::string name, std::string mess){
+        std::ofstream MyFile(name, std::ios::app);
+        // Write to the file
+        MyFile << mess;
+        // Close the file
+        MyFile.close();
+    }
+}
 
 //annexe path : ./annexe
 //folder_name: Weekday_M_d_y exp Sat_Jan_10_2026
@@ -103,7 +126,7 @@ void Image::save_plateInfo(){
     write_file(annexe+"/"+folder_name+"/"+folder_name+".txt", message);
 }
 
-const cv::Mat Image::get_frame(){
+cv::Mat& Image::get_frame(){
     return image_frame;
 }
 const std::string Image::get_idImage(){
@@ -119,24 +142,3 @@ std::vector<cv::Mat> Image::get_plateFrame(){
 }
 
 
-
-namespace {
-    std::string string_clean(std::string& s) {
-        // Logique de découpe ou mise en forme
-        while(s.find(" ") < s.length()){
-            s[s.find(" ")] = '_';
-        }
-        while(s.find(":") < s.length()){
-            s[s.find(":")] = '-';
-        }
-        return s;
-    }
-
-    void write_file(std::string name, std::string mess){
-        std::ofstream MyFile(name, std::ios::app);
-        // Write to the file
-        MyFile << mess;
-        // Close the file
-        MyFile.close();
-    }
-}

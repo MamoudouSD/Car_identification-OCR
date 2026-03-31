@@ -1,10 +1,13 @@
+
+//commencer par cam2 ()
+
 #include "System.hpp"
 #include <pthread/pthread_impl.h>
 
 Notification notif("Plate_detection");
 Camera cam1(&notif);
 Camera cam2(&notif);
-Ai* yolo = new Yolo_infer("Ai_file/model_quantified_executorch.pte", &notif, 0.25, 0.6);
+Ai<Detection>* yolo = new Yolo_infer("Ai_file/model_quantified_executorch.pte", &notif, 0.25, 0.6);
 int nb =0;
 ThreadSafe_queue<Image> img_toAi(30);
 ThreadSafe_queue<Image> img_toDisplay(30);
@@ -30,7 +33,7 @@ bool system_init(){
     gpio_init();
     display_init();
 
-    result = cam1.cam_init(1);
+    result = cam1.cam_init(0);
     if (!result){
         col1 = RED;
     }
@@ -133,6 +136,48 @@ void sequencer(){
     screen_semaphore.release();
 }
 
+void set_non_blocking(bool enable){
+    static struct termios oldt, newt;
+    if (enable) {
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO); // mode non canonique
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+    } else {
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        fcntl(STDIN_FILENO, F_SETFL, 0);
+    }
+}
+
+void watchdog(){
+    set_non_blocking(true);
+    std::cout << "Appuie sur la touche f pour arreter le systeme\n";
+    bool cond = true
+    while (cond) {
+        char c = getchar();
+        if (c != EOF) {
+            if (c == 'f'){
+                cond = false;
+                sequencer_v = false;
+                capture_v = false;
+                inference_v = false;
+                screen_v = false;
+                save_v = false;
+
+                capture1_semaphore.release();
+                capture2_semaphore.release();
+                inference_semaphore.release();
+                save_semaphore.release();
+                screen_semaphore.release();
+            }
+        }
+        usleep(100000); // 100 ms
+    }
+    
+    set_non_blocking(false);
+}
+
 void set_realtime_priority(int pr, int cpu) {
     struct sched_param param;
     param.sched_priority = pr;
@@ -187,8 +232,20 @@ int start(){
         sequencer();
     });
 
-    sequencer_thread.join();
+    std::thread watchdog_thread ([](){
+        set_realtime_priority(98, 3);
+        watchdog();
+    });
+    watchdog_thread.join();
+    return true;
 }
 
 
-int system_end();
+int system_end(){
+    while (!img_toSave.empty()){
+        auto img = img_toSave.pop();
+        img.save_frame();
+        img.save_plateInfo();
+    }
+    return true;
+}

@@ -16,3 +16,4 @@ Notification::~Notification(){
     syslog(priority_info, "Connection closes to the system logger");
     closelog();
 }
+

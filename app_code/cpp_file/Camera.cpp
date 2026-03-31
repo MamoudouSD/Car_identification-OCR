@@ -1,4 +1,6 @@
 #include "Camera.hpp"
+#include <string>
+
 
 Camera::Camera(Notification *n){
     notif = n;
@@ -20,7 +22,7 @@ bool Camera::cam_init(int id){
     }
 }
 
-bool Camera::captureFrame(){
+bool Camera::capture_frame(){
     if (!camera.isOpened()){
         notif->notice_err("Camera with id: " + std::to_string(id_device) + " is not opened");
         return false;

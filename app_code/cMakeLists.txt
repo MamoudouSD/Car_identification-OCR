@@ -2,25 +2,21 @@ cmake_minimum_required(VERSION 3.28)
 
 project(Car_identification_OCR)
 
-set(sources cpp_file/main.cpp cpp_file/Ai.cpp cpp_file/Camera.cpp cpp_file/Display.cpp cpp_file/Image.cpp cpp_file/Notification.cpp cpp_file/Yolo_infer.cpp cpp_file/System.cpp)#indiquer les fichiers .cpp
-
-set(headers hpp_file/Ai.hpp hpp_file/Display.hpp hpp_file/Image.hpp hpp_file/Notification.hpp hpp_file/Yolo_infer.hpp hpp_file/System.hpp)#indiquer les fichier .hpp
-
 # Set the C++ standard to C++17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_PREFIX_PATH path__/libtorch)
+set(sources cpp_file/main.cpp cpp_file/Ai.cpp cpp_file/Camera.cpp cpp_file/Display.cpp cpp_file/Image.cpp cpp_file/Notification.cpp cpp_file/Yolo_infer.cpp cpp_file/System.cpp)#indiquer les fichiers .cpp
 
-list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew")
 
-add_executable(cao ${sources} ${headers})
+
+add_executable(Car_identification_OCR ${sources})
 
 find_package(OpenCV REQUIRED)
 find_package(Torch REQUIRED)
 
-target_include_directories(cao PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/hpp_file" ${OpenCV_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS})
+target_include_directories(Car_identification_OCR PRIVATE hpp_file ${OpenCV_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS})
 
-target_link_directories(cao ${OpenCV_LIBS} ${TORCH_LIBRARIES})
+target_link_libraries(Car_identification_OCR ${OpenCV_LIBS} ${TORCH_LIBRARIES})
 
 

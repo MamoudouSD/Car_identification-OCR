@@ -7,8 +7,7 @@
 #include <ctime>
 #include <vector>
 #include "Notification.hpp"
-#include <filesystem>
-#include <fstream>
+
 
 
 class Image{
@@ -21,7 +20,7 @@ class Image{
         void save_plateInfo();
         void set_plateCoord(cv::Rect coord);
         void set_plateCoordScore(float score);
-        const cv::Mat get_frame();
+        cv::Mat& get_frame();
         const std::string get_idImage();
         const int get_camId();
         std::vector<cv::Mat> get_plateFrame();
@@ -36,7 +35,7 @@ class Image{
         std::string image_id;
         std::string folder_name;
         Notification* notif;
-        const std::string annexe = "annexe";
+        const std::string annexe = "../annexe";
         int nb;
         int cam_id;
 };

@@ -1,10 +1,11 @@
 #include "Ai.hpp"
 
-Ai::Ai(std::string path, Notification* n){
+template <typename T>
+Ai<T>::Ai(std::string path, Notification* n){
     model_path = path;
     notif = n;
 }
-
-Ai::~Ai(){
+template <typename T>
+Ai<T>::~Ai(){
 }
 

@@ -13,7 +13,10 @@
 #include <thread>
 #include <pthread.h>
 #include "ThreadSafe_queue.hpp"
-
+#include <iostream>
+#include <unistd.h>
+#include <termios.h>
+#include <fcntl.h>
 
 
 
@@ -24,4 +27,6 @@ void screen();
 void save();
 void sequencer();
 int start();
+void set_non_blocking(bool enable);
+void watchdog();
 int system_end();

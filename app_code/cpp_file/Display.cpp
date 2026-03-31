@@ -1,39 +1,95 @@
 #include "Display.hpp"
+#include <chrono>
+#include <thread>
+#include <sys/mman.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-static inline void wr_strobe() {
-    *GPCLR0 = 0x200000;
-    *GPSET0 = 0x200000;
+
+
+namespace
+{
+    volatile uint32_t* gpio_base = nullptr;
+    int gpio_fd = -1;
+
+    constexpr size_t GPIO_BLOCK_SIZE = 4096;
+
+    // offsets en mots 32 bits depuis gpio_base
+    constexpr size_t GPFSEL0 = 0x00 / 4;
+    constexpr size_t GPFSEL1 = 0x04 / 4;
+    constexpr size_t GPFSEL2 = 0x08 / 4;
+    constexpr size_t GPSET0  = 0x1C / 4;
+    constexpr size_t GPCLR0  = 0x28 / 4;
+    
+    static inline void wr_strobe() {
+        gpio_base[GPCLR0] = 0x200000;
+        gpio_base[GPSET0] = 0x200000;
+    }
+
+    static inline void write_bus(uint32_t value) {
+        gpio_base[GPCLR0] = 0x0FFFF0;
+        gpio_base[GPSET0] = (value << 4);
+    }
+
+    static inline void write_data(uint32_t value) {
+        write_bus(value);
+        wr_strobe();
+    }
+
+    static inline void write_command(uint32_t cmd) {
+        gpio_base[GPCLR0] = 0x500000;   // CS active, DC command
+        write_bus(cmd);
+        wr_strobe();
+        gpio_base[GPSET0] = 0x100000;   // DC data
+    }
+
+    static inline void end_data_stream() {
+        gpio_base[GPSET0] = 0x400000;
+        gpio_base[GPSET0] = 0xF00000;
+        gpio_base[GPCLR0] = 0x0FFFF0;
+    }
+} 
+
+bool gpio_map_init() {
+    gpio_fd = open("/dev/gpiomem", O_RDWR | O_SYNC);
+    if (gpio_fd < 0) {
+        perror("open /dev/gpiomem");
+        return false;
+    }
+    gpio_base = (volatile uint32_t*)(
+        mmap(nullptr, GPIO_BLOCK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, gpio_fd, 0)
+    );
+    if (gpio_base == MAP_FAILED) {
+        perror("mmap");
+        gpio_base = nullptr;
+        close(gpio_fd);
+        gpio_fd = -1;
+        return false;
+    }
+    return true;
 }
 
-static inline void write_bus(uint32_t value) {
-    *GPCLR0 = 0x0FFFF0;
-    *GPSET0 = (value << 4);
+void gpio_map_close() {
+    if (gpio_base) {
+        munmap((uint32_t*)((const uint32_t*)(gpio_base)), GPIO_BLOCK_SIZE);
+        gpio_base = nullptr;
+    }
+    if (gpio_fd >= 0) {
+        close(gpio_fd);
+        gpio_fd = -1;
+    }
 }
-
-static inline void write_data(uint32_t value) {
-    write_bus(value);
-    wr_strobe();
-}
-
-static inline void write_command(uint32_t cmd) {
-    *GPCLR0 = 0x500000;   // CS active, DC command
-    write_bus(cmd);
-    wr_strobe();
-    *GPSET0 = 0x100000;   // DC data
-}
-
-static inline void end_data_stream() {
-    *GPSET0 = 0x400000;
-    *GPSET0 = 0xF00000;
-    *GPCLR0 = 0x0FFFF0;
-}
-
 
 void gpio_init(){
-    *GPFSEL0 = GPFSEL0_V;
-    *GPFSEL1 = GPFSEL1_v;
-    *GPFSEL2 = GPFSEL2_v;
-    *GPSET0 = 0xF00000;
+    bool result =  gpio_map_init();
+    if (gpio_base) {
+        gpio_base[GPFSEL0] = GPFSEL0_V;
+        gpio_base[GPFSEL1] = GPFSEL1_v;
+        gpio_base[GPFSEL2] = GPFSEL2_v;
+        gpio_base[GPSET0] = 0xF00000;
+    }
+
 }
 
 void send_configData(uint32_t cmd, uint32_t *data, int length){
@@ -47,9 +103,9 @@ void send_configData(uint32_t cmd, uint32_t *data, int length){
 
 void display_init(){
     uint32_t noData[0];
-    *GPCLR0 = 0x800000;
+    gpio_base[GPCLR0] = 0x800000;
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    *GPSET0 = 0x800000;
+    gpio_base[GPSET0] = 0x800000;
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
 
