@@ -1,41 +1,41 @@
 # 🚗 Car Plate Identification
 
-Système embarqué temps-réel de **détection de plaques d'immatriculation** sur architecture ARM (aarch64). Le pipeline capture des images depuis deux caméras simultanément, exécute une inférence YOLO via **ExecuTorch + XNNPACK**, affiche les résultats sur un écran LCD et sauvegarde les détections sur disque — le tout orchestré par un séquenceur temps-réel multi-thread.
+Real-time embedded system for **license plate detection** on ARM architecture (aarch64). The pipeline captures images from two cameras simultaneously, runs YOLO inference via **ExecuTorch + XNNPACK**, displays results on an LCD screen and saves detections to disk — all orchestrated by a real-time multi-thread sequencer.
 
 ---
 
-## 📋 Table des matières
+## 📋 Table of Contents
 
-- [Architecture du système](#architecture-du-système)
-- [Analyse temps-réel — Rate Monotonic Analysis](#analyse-temps-réel--rate-monotonic-analysis)
-- [Structure du projet](#structure-du-projet)
-- [Prérequis](#prérequis)
-- [Installation de l'environnement](#installation-de-lenvironnement)
-  - [Mise à jour du système](#1-mise-à-jour-du-système)
-  - [Installation de Miniconda](#2-installation-de-miniconda)
-  - [Création de l'environnement Conda](#3-création-de-lenvironnement-conda)
-  - [Installation et compilation d'OpenCV](#4-installation-et-compilation-dopencv)
-  - [Installation de PyTorch et dépendances Python](#5-installation-de-pytorch-et-dépendances-python)
-- [Installation d'ExecuTorch](#installation-dexecutorch)
-  - [Cloner et initialiser](#1-cloner-et-initialiser)
+- [System Architecture](#system-architecture)
+- [Real-Time Analysis — Rate Monotonic Analysis](#real-time-analysis--rate-monotonic-analysis)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Environment Setup](#environment-setup)
+  - [System Update](#1-system-update)
+  - [Miniconda Installation](#2-miniconda-installation)
+  - [Conda Environment Creation](#3-conda-environment-creation)
+  - [OpenCV Build from Source](#4-opencv-build-from-source)
+  - [PyTorch and Python Dependencies](#5-pytorch-and-python-dependencies)
+- [ExecuTorch Installation](#executorch-installation)
+  - [Clone and Initialize](#1-clone-and-initialize)
   - [Build ExecuTorch](#2-build-executorch)
-  - [Correction d'erreur connue — FlatCC](#correction-derreur-connue--flatcc)
-- [Build du projet](#build-du-projet)
-- [Utilisation](#utilisation)
-- [Modèle IA](#modèle-ia)
-- [Technologies utilisées](#technologies-utilisées)
-- [Dépannage](#dépannage)
-- [Licence](#licence)
+  - [Known Build Error — FlatCC](#known-build-error--flatcc)
+- [Project Build](#project-build)
+- [Usage](#usage)
+- [AI Model](#ai-model)
+- [Technologies](#technologies)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
 ---
 
-## Architecture du système
+## System Architecture
 
-Le système repose sur un pipeline **multi-thread** piloté par un séquenceur temps-réel (timer POSIX SIGALRM, tick à 5 ms). Chaque tâche s'exécute sur un cœur CPU dédié avec une priorité temps-réel `SCHED_FIFO`.
+The system relies on a **multi-threaded** pipeline driven by a real-time sequencer (POSIX SIGALRM timer, 5 ms tick). Each task runs on a dedicated CPU core with `SCHED_FIFO` real-time scheduling policy.
 
 ```
 ┌─────────────┐     ┌──────────────────────────────────────────────────────┐
-│  Séquenceur │────▶│                  Threads (CPU affinity)              │
+│  Sequencer  │────▶│                  Threads (CPU affinity)              │
 │  (5ms tick) │     ├──────────┬──────────┬────────────┬──────┬──────────┤
 └─────────────┘     │ capture1 │ capture2 │ inference  │ save │ screen   │
                     │ (CPU 0)  │ (CPU 1)  │  (CPU 2)   │(CPU1)│ (CPU 0)  │
@@ -55,171 +55,171 @@ Le système repose sur un pipeline **multi-thread** piloté par un séquenceur t
                     └────────────────────────────────────────────┘
 ```
 
-**Cadences du séquenceur :**
-- Toutes les **48 ticks (240 ms)** → capture caméra 1 + caméra 2
-- Toutes les **35 ticks (175 ms)** → affichage écran + sauvegarde
-- Toutes les **70 ticks (350 ms)** → inférence IA
+**Sequencer cadences:**
+- Every **48 ticks (240 ms)** → camera 1 + camera 2 capture
+- Every **35 ticks (175 ms)** → screen display + save
+- Every **70 ticks (350 ms)** → AI inference
 
 ---
 
-## Analyse temps-réel — Rate Monotonic Analysis
+## Real-Time Analysis — Rate Monotonic Analysis
 
-Les priorités des tâches sont déterminées par **Rate Monotonic Analysis (RMA)** : plus la période est courte, plus la priorité est haute. Chaque tâche est épinglée sur un cœur dédié (`pthread_setaffinity_np`) avec une politique d'ordonnancement `SCHED_FIFO`.
+Task priorities are determined using **Rate Monotonic Analysis (RMA)**: the shorter the period, the higher the priority. Each task is pinned to a dedicated CPU core (`pthread_setaffinity_np`) with the `SCHED_FIFO` scheduling policy.
 
-**Affectation des tâches aux cœurs :**
+**Task-to-core assignment:**
 
-| Tâche | Cœur CPU | Priorité SCHED_RR |
-|-------|----------|-------------------|
-| Cam1 (capture caméra 1) | Cœur 1 (CPU 0) | 80 |
-| Display (affichage LCD) | Cœur 1 (CPU 0) | 60 |
-| Cam2 (capture caméra 2) | Cœur 2 (CPU 1) | 80 |
-| Save (sauvegarde) | Cœur 2 (CPU 1) | 60 |
-| AI (inférence YOLO) | Cœur 3 (CPU 2) | 90 |
-| Main / Séquenceur | Cœur 4 (CPU 3) | 89 |
+| Task | CPU Core | SCHED_FIFO Priority |
+|------|----------|---------------------|
+| Cam1 (camera 1 capture) | Core 1 (CPU 0) | 80 |
+| Display (LCD) | Core 1 (CPU 0) | 60 |
+| Cam2 (camera 2 capture) | Core 2 (CPU 1) | 80 |
+| Save (disk write) | Core 2 (CPU 1) | 60 |
+| AI (YOLO inference) | Core 3 (CPU 2) | 90 |
+| Main / Sequencer | Core 4 (CPU 3) | 89 |
 
 ---
 
-### Tableaux RMA par cœur
+### RMA Tables per Core
 
-Les colonnes sont : **P** = période (ms), **F** = fréquence (Hz), **So** = nombre d'occurrences par tick, **Priority** = priorité RMA (1 = plus haute), **C** = temps d'exécution (ms), **U%** = taux d'utilisation CPU.
+Column definitions: **P** = period (ms), **F** = frequency (Hz), **So** = occurrences per sequencer tick, **Priority** = RMA priority (1 = highest), **C** = execution time (ms), **U%** = CPU utilization.
 
-> Le taux d'utilisation est calculé comme U = C / P × 100. La limite de faisabilité RMA pour n tâches est U ≤ n × (2^(1/n) − 1).
+> Utilization is computed as U = C / P × 100. The RMA schedulability bound for n tasks is U ≤ n × (2^(1/n) − 1).
 
-**Cœur 1 — Cam1 + Display** (U total = 27.14%, limite RMA 2 tâches ≈ 82.8% ✅)
+**Core 1 — Cam1 + Display** (total U = 27.14%, RMA bound for 2 tasks ≈ 82.8% ✅)
 
-| Tâche | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
-|-------|--------|--------|----|----------|--------|----|
+| Task | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
+|------|--------|--------|----|----------|--------|----|
 | T1 — Capture Cam1 | 240 | 4.17 | 1.36 | **1** | 62 | 26% |
 | T2 — Display | 175 | 5.71 | 1 | **2** | 2 | 1.14% |
 
-**Cœur 2 — Cam2 + Save** (U total = 29.43%, limite RMA 2 tâches ≈ 82.8% ✅)
+**Core 2 — Cam2 + Save** (total U = 29.43%, RMA bound for 2 tasks ≈ 82.8% ✅)
 
-| Tâche | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
-|-------|--------|--------|----|----------|--------|----|
+| Task | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
+|------|--------|--------|----|----------|--------|----|
 | T1 — Capture Cam2 | 240 | 4.17 | 1.36 | **1** | 62 | 26% |
 | Tk — Save | 175 | 5.71 | 1 | **2** | 6 | 3.43% |
 
-**Cœur 3 — Inférence IA** (U = 91.14%, limite RMA 1 tâche = 100% ✅)
+**Core 3 — AI Inference** (U = 91.14%, RMA bound for 1 task = 100% ✅)
 
-| Tâche | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
-|-------|--------|--------|----|----------|--------|----|
+| Task | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
+|------|--------|--------|----|----------|--------|----|
 | T2 — AI Inference | 350 | 2.86 | 1 | **1** | 319 | 91.14% |
 
-> ⚠️ La tâche d'inférence est la plus coûteuse du système (319 ms sur 350 ms de période). Le cœur 3 est dédié exclusivement à cette tâche pour garantir son respect d'échéance.
+> ⚠️ The inference task is the most compute-intensive in the system (319 ms out of a 350 ms period). Core 3 is exclusively dedicated to this task to guarantee deadline compliance.
 
-**Cœur 4 — Séquenceur / Main** (U = 40%, limite RMA 1 tâche = 100% ✅)
+**Core 4 — Sequencer / Main** (U = 40%, RMA bound for 1 task = 100% ✅)
 
-| Tâche | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
-|-------|--------|--------|----|----------|--------|----|
-| T2 — Séquenceur | 5 | 200 | 1 | **1** | 2 | 40% |
+| Task | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
+|------|--------|--------|----|----------|--------|----|
+| T2 — Sequencer | 5 | 200 | 1 | **1** | 2 | 40% |
 
-> Le séquenceur tourne à 200 Hz (tick 5 ms) et orchestre toutes les autres tâches via des sémaphores binaires POSIX.
+> The sequencer runs at 200 Hz (5 ms tick) and orchestrates all other tasks via POSIX binary semaphores.
 
 ---
 
-## Structure du projet
+## Project Structure
 
 ```
 Car_plate_identification/
-├── AI/                                         # Modèles et données IA
-│   ├── Data_exploration.ipynb                  # Notebook d'exploration du dataset
-│   ├── yolov8n.pt                              # Modèle YOLOv8n de base
-│   ├── yolov8n_finetune.pt                     # Modèle fine-tuné
-│   ├── yolov8n_finetune_pruned.pt              # Modèle pruné (PyTorch)
-│   ├── yolov8n_finetune_pruned.onnx            # Modèle pruné (ONNX)
-│   ├── yolov8n_pruned_state_dict.pt            # State dict du modèle pruné
-│   ├── model_quantified_executorch.pte         # Modèle final (ExecuTorch quantifié)
-│   └── calibration_image_sample_data_*.npy    # Données de calibration quantification
+├── AI/                                         # AI models and data
+│   ├── Data_exploration.ipynb                  # Dataset exploration notebook
+│   ├── yolov8n.pt                              # Base YOLOv8n model
+│   ├── yolov8n_finetune.pt                     # Fine-tuned model
+│   ├── yolov8n_finetune_pruned.pt              # Pruned model (PyTorch)
+│   ├── yolov8n_finetune_pruned.onnx            # Pruned model (ONNX)
+│   ├── yolov8n_pruned_state_dict.pt            # Pruned model state dict
+│   ├── model_quantified_executorch.pte         # Final model (ExecuTorch quantized)
+│   └── calibration_image_sample_data_*.npy    # Quantization calibration data
 │
-├── app_code/                                   # Application C++ embarquée
-│   ├── cMakeLists.txt                          # Configuration CMake
+├── app_code/                                   # Embedded C++ application
+│   ├── cMakeLists.txt                          # CMake configuration
 │   ├── Ai_file/
-│   │   └── model_quantified_executorch.pte     # Modèle utilisé par l'app
+│   │   └── model_quantified_executorch.pte     # Model used by the app
 │   ├── cpp_file/
-│   │   ├── main.cpp                            # Point d'entrée
-│   │   ├── System.cpp                          # Orchestration threads + séquenceur
-│   │   ├── Yolo_infer.cpp                      # Inférence YOLOv8 via ExecuTorch
-│   │   ├── Camera.cpp                          # Capture vidéo (OpenCV)
-│   │   ├── Image.cpp                           # Traitement + sauvegarde images
-│   │   ├── Display.cpp                         # Pilote LCD (GPIO / /dev/gpiomem)
+│   │   ├── main.cpp                            # Entry point
+│   │   ├── System.cpp                          # Thread orchestration + sequencer
+│   │   ├── Yolo_infer.cpp                      # YOLOv8 inference via ExecuTorch
+│   │   ├── Camera.cpp                          # Video capture (OpenCV)
+│   │   ├── Image.cpp                           # Image processing + saving
+│   │   ├── Display.cpp                         # LCD driver (GPIO / /dev/gpiomem)
 │   │   └── Notification.cpp                    # Logging via syslog
 │   └── hpp_file/
-│       ├── Ai.hpp                              # Classe abstraite IA (template)
-│       ├── Yolo_infer.hpp                      # Interface YOLO
-│       ├── Camera.hpp                          # Interface caméra
-│       ├── Image.hpp                           # Interface image
-│       ├── Display.hpp                         # Interface affichage LCD
-│       ├── System.hpp                          # Interface système
-│       ├── Notification.hpp                    # Interface notification
-│       └── ThreadSafe_queue.hpp                # File d'attente thread-safe (template)
+│       ├── Ai.hpp                              # Abstract AI base class (template)
+│       ├── Yolo_infer.hpp                      # YOLO interface
+│       ├── Camera.hpp                          # Camera interface
+│       ├── Image.hpp                           # Image interface
+│       ├── Display.hpp                         # LCD display interface
+│       ├── System.hpp                          # System interface
+│       ├── Notification.hpp                    # Notification interface
+│       └── ThreadSafe_queue.hpp                # Thread-safe queue (template)
 │
 └── LICENSE                                     # MIT License
 ```
 
 ---
 
-## Prérequis
+## Prerequisites
 
-- **Architecture :** Linux aarch64 (ARM 64-bit — Raspberry Pi 4/5, Jetson, etc.)
-- **OS :** Ubuntu 22.04+ recommandé
-- **Matériel :**
-  - 2 caméras USB (IDs 0 et 2 par défaut, MJPG, 640×480 @ 30fps)
-  - Écran LCD connecté via GPIO (bus parallèle 16 bits, `/dev/gpiomem`)
-- **Espace disque :** ~10 Go minimum
-- **RAM :** 4 Go minimum
-- **Droits :** accès à `/dev/gpiomem` pour le pilote LCD
+- **Architecture:** Linux aarch64 (ARM 64-bit — Raspberry Pi 4/5, Jetson, etc.)
+- **OS:** Ubuntu 22.04+ recommended
+- **Hardware:**
+  - 2 USB cameras (IDs 0 and 2 by default, MJPG, 640×480 @ 30fps)
+  - LCD screen connected via GPIO (16-bit parallel bus, `/dev/gpiomem`)
+- **Disk space:** ~10 GB minimum
+- **RAM:** 4 GB minimum
+- **Permissions:** access to `/dev/gpiomem` for the LCD driver
 
 ---
 
-## Installation de l'environnement
+## Environment Setup
 
-### 1. Mise à jour du système
+### 1. System Update
 
 ```bash
 sudo apt update
 sudo apt upgrade
 ```
 
-### 2. Installation de Miniconda
+### 2. Miniconda Installation
 
 ```bash
-# Téléchargement de l'installeur ARM64
+# Download the ARM64 installer
 curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh
 
-# Exécution de l'installeur (installer dans /home/<username>/)
+# Run the installer (install in /home/<username>/)
 bash ~/Miniconda3-latest-Linux-aarch64.sh
 
-# Rechargement du shell
+# Reload shell
 source ~/.bashrc
 ```
 
-### 3. Création de l'environnement Conda
+### 3. Conda Environment Creation
 
 ```bash
 conda create --name cpd_env python=3.10.19
 conda activate cpd_env
 ```
 
-### 4. Installation et compilation d'OpenCV
+### 4. OpenCV Build from Source
 
-> ⚠️ OpenCV doit être compilé depuis les sources sur aarch64 pour garantir la compatibilité.
+> ⚠️ OpenCV must be compiled from source on aarch64 to ensure compatibility.
 
 ```bash
-# Outils de compilation
+# Build tools
 conda install gxx_linux-aarch64 cmake make
 
-# Téléchargement et extraction des sources
+# Download and extract sources
 wget -O opencv.zip https://github.com/opencv/opencv/archive/4.x.zip
 unzip opencv.zip
 mv opencv-4.x opencv
 
-# Compilation
+# Build
 mkdir -p build && cd build
 cmake ../opencv
 make -j4
 ```
 
-### 5. Installation de PyTorch et dépendances Python
+### 5. PyTorch and Python Dependencies
 
 ```bash
 conda install conda-forge::pytorch
@@ -228,16 +228,16 @@ conda install pyyaml
 
 ---
 
-## Installation d'ExecuTorch
+## ExecuTorch Installation
 
-### 1. Cloner et initialiser
+### 1. Clone and Initialize
 
 ```bash
 git clone -b release/1.1 https://github.com/pytorch/executorch.git
 cd executorch
 conda activate cpd_env
 
-# Initialisation de tous les sous-modules
+# Initialize all submodules
 git submodule update --init --recursive
 ```
 
@@ -248,9 +248,9 @@ cmake -B cmake-out --preset linux -DCMAKE_BUILD_TYPE=Release
 cmake --build cmake-out -j9
 ```
 
-### Correction d'erreur connue — FlatCC
+### Known Build Error — FlatCC
 
-Lors du build, l'erreur suivante peut survenir :
+The following error may occur during the build:
 
 ```
 executorch/third-party/flatcc/include/flatcc/portable/grisu3_print.h:186:33:
@@ -259,22 +259,22 @@ error: initializer-string for array of 'char' truncates NUL terminator
   186 |     static char hexdigits[16] = "0123456789ABCDEF";
 ```
 
-**Cause :** le compilateur GCC ARM ajoute un terminateur nul `\0` à la chaîne, ce qui donne 17 caractères pour un tableau de 16 cases.
+**Cause:** the ARM GCC compiler appends a null terminator `\0` to the string literal, resulting in 17 characters for a 16-element array.
 
-**Correction :** éditer le fichier `executorch/third-party/flatcc/include/flatcc/portable/grisu3_print.h` et remplacer la ligne 186 :
+**Fix:** edit `executorch/third-party/flatcc/include/flatcc/portable/grisu3_print.h` and replace line 186:
 
 ```c
-// Avant (ligne fautive)
+// Before (faulty line)
 static char hexdigits[16] = "0123456789ABCDEF";
 
-// Après (correction)
+// After (fix)
 static char hexdigits[16] = {
     '0','1','2','3','4','5','6','7',
     '8','9','A','B','C','D','E','F'
 };
 ```
 
-Puis relancer le build :
+Then re-run the build:
 
 ```bash
 cmake -B cmake-out --preset linux -DCMAKE_BUILD_TYPE=Release
@@ -283,9 +283,9 @@ cmake --build cmake-out -j9
 
 ---
 
-## Build du projet
+## Project Build
 
-Placer le dépôt ExecuTorch buildé dans `app_code/executorch/`, puis depuis `app_code/` :
+Place the built ExecuTorch repository inside `app_code/executorch/`, then from `app_code/`:
 
 ```bash
 cd app_code
@@ -304,47 +304,47 @@ cmake .. \
 make -j4
 ```
 
-**Description des flags CMake :**
+**CMake flags description:**
 
 | Flag | Description |
 |------|-------------|
-| `EXECUTORCH_BUILD_XNNPACK` | Backend CPU optimisé ARM (NEON/SIMD) |
-| `EXECUTORCH_BUILD_EXTENSION_MODULE` | Module de chargement des modèles `.pte` |
-| `EXECUTORCH_BUILD_EXTENSION_DATA_LOADER` | Chargement des poids du modèle |
-| `EXECUTORCH_BUILD_KERNELS_QUANTIZED` | Kernels pour modèles quantifiés (int8) |
-| `EXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR` | Support du format FlatTensor |
-| `EXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP` | Accès nommé aux données du modèle |
-| `EXECUTORCH_BUILD_EXTENSION_TENSOR` | Extension tenseur de base |
+| `EXECUTORCH_BUILD_XNNPACK` | ARM-optimized CPU backend (NEON/SIMD) |
+| `EXECUTORCH_BUILD_EXTENSION_MODULE` | Module loader for `.pte` model files |
+| `EXECUTORCH_BUILD_EXTENSION_DATA_LOADER` | Model weight loading |
+| `EXECUTORCH_BUILD_KERNELS_QUANTIZED` | Kernels for quantized models (int8) |
+| `EXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR` | FlatTensor format support |
+| `EXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP` | Named data access for model tensors |
+| `EXECUTORCH_BUILD_EXTENSION_TENSOR` | Base tensor extension |
 
 ---
 
-## Utilisation
+## Usage
 
 ```bash
-# Lancer l'exécutable depuis le dossier build
+# Run the executable from the build folder
 ./Car_Plate_identification
 ```
 
-Au démarrage, le système :
-1. Initialise le GPIO et l'écran LCD (séquence de couleurs de test)
-2. Ouvre les deux caméras (IDs 2 et 0)
-3. Charge le modèle ExecuTorch depuis `../Ai_file/model_quantified_executorch.pte`
+On startup, the system:
+1. Initializes GPIO and the LCD screen (color test sequence)
+2. Opens both cameras (IDs 2 and 0)
+3. Loads the ExecuTorch model from `../Ai_file/model_quantified_executorch.pte`
 
-Une fois l'initialisation réussie :
+Once initialization succeeds:
 
 ```
 pour commencer cliquer sur s
 ```
 
-Appuyer sur `s` puis `Entrée` pour démarrer le pipeline. Appuyer sur `Ctrl+C` pour arrêter proprement (le système vide les queues et sauvegarde les dernières images avant de quitter).
+Press `s` then `Enter` to start the pipeline. Press `Ctrl+C` to stop gracefully (the system flushes remaining queues and saves the last images before exiting).
 
-**Sorties générées :**
+**Generated outputs:**
 
-Les images et métadonnées sont sauvegardées dans un dossier `./data/<date>/` :
-- `<date>.txt` — CSV avec colonnes `id ; nombre_de_plaques ; coordonnées_bbox`
-- `<image_id>.jpeg` — image avec bounding boxes dessinées
+Images and metadata are saved in a `./data/<date>/` folder:
+- `<date>.txt` — CSV file with columns `id ; plate_count ; bbox_coordinates`
+- `<image_id>.jpeg` — image with drawn bounding boxes
 
-Les logs système sont accessibles via syslog (identifiant `Plate_detection`) :
+System logs are accessible via syslog (identifier `Plate_detection`):
 
 ```bash
 journalctl -t Plate_detection -f
@@ -352,99 +352,99 @@ journalctl -t Plate_detection -f
 
 ---
 
-## Modèle IA
+## AI Model
 
-Le pipeline IA suit les étapes suivantes :
+The AI pipeline follows these steps:
 
 ```
 YOLOv8n (base)
     │
     ▼
-Fine-tuning sur dataset plaques  →  yolov8n_finetune.pt
+Fine-tuning on plate dataset  →  yolov8n_finetune.pt
     │
     ▼
-Pruning du modèle  →  yolov8n_finetune_pruned.pt / .onnx
+Model pruning  →  yolov8n_finetune_pruned.pt / .onnx
     │
     ▼
-Quantification + export ExecuTorch  →  model_quantified_executorch.pte
+Quantization + ExecuTorch export  →  model_quantified_executorch.pte
     │
     ▼
-Inférence embarquée via XNNPACK
+Embedded inference via XNNPACK
 ```
 
-**Paramètres d'inférence :**
+**Inference parameters:**
 
-| Paramètre | Valeur |
-|-----------|--------|
+| Parameter | Value |
+|-----------|-------|
 | Score threshold | 0.25 |
 | NMS threshold | 0.60 |
-| Résolution entrée caméra | 640 × 480 px |
-| Résolution affichage plaque | 240 × 320 px |
-| Anchors traités | 8 400 |
-| Format tenseur entrée | `[1, 3, H, W]` float32 normalisé [0, 1] |
+| Camera input resolution | 640 × 480 px |
+| Plate display resolution | 240 × 320 px |
+| Processed anchors | 8,400 |
+| Input tensor format | `[1, 3, H, W]` float32 normalized [0, 1] |
 
 ---
 
-## Technologies utilisées
+## Technologies
 
-| Technologie | Version | Rôle |
-|-------------|---------|------|
-| **C++** | C++20 | Application embarquée temps-réel |
-| **Python** | 3.10.19 | Entraînement, pruning, export modèle |
-| **YOLOv8n** | Ultralytics | Détection de plaques |
-| **ExecuTorch** | release/1.1 | Runtime d'inférence embarqué |
-| **XNNPACK** | (inclus ET) | Accélération CPU ARM (NEON/SIMD) |
-| **OpenCV** | 4.x | Capture vidéo, traitement image, NMS |
-| **PyTorch** | conda-forge | Fine-tuning et export |
-| **POSIX threads** | — | Multi-threading temps-réel (SCHED_RR) |
-| **syslog** | — | Journalisation système |
-| **CMake** | ≥ 3.28 | Système de build |
-| **Miniconda** | latest aarch64 | Gestion environnement Python |
+| Technology | Version | Role |
+|------------|---------|------|
+| **C++** | C++20 | Embedded real-time application |
+| **Python** | 3.10.19 | Model training, pruning, export |
+| **YOLOv8n** | Ultralytics | License plate detection |
+| **ExecuTorch** | release/1.1 | Embedded inference runtime |
+| **XNNPACK** | (bundled) | ARM CPU acceleration (NEON/SIMD) |
+| **OpenCV** | 4.x | Video capture, image processing, NMS |
+| **PyTorch** | conda-forge | Fine-tuning and export |
+| **POSIX threads** | — | Real-time multi-threading (SCHED_FIFO) |
+| **syslog** | — | System logging |
+| **CMake** | ≥ 3.28 | Build system |
+| **Miniconda** | latest aarch64 | Python environment management |
 
 ---
 
-## Dépannage
+## Troubleshooting
 
-**Erreur `unterminated-string-initialization` dans FlatCC**
+**`unterminated-string-initialization` error in FlatCC**
 
-Voir la section [Correction d'erreur connue — FlatCC](#correction-derreur-connue--flatcc) ci-dessus.
+See the [Known Build Error — FlatCC](#known-build-error--flatcc) section above.
 
-**`conda activate` ne fonctionne pas dans un script bash**
+**`conda activate` does not work in a bash script**
 
 ```bash
 source ~/.bashrc
 conda activate cpd_env
 ```
 
-**Erreur d'ouverture de caméra**
+**Camera open error**
 
-Vérifier les IDs disponibles :
+Check available device IDs:
 ```bash
 ls /dev/video*
 ```
-Les IDs 0 et 2 sont codés dans `System.cpp`. Les adapter si nécessaire.
+IDs 0 and 2 are hardcoded in `System.cpp`. Update them if needed.
 
-**Accès refusé à `/dev/gpiomem`**
+**Permission denied on `/dev/gpiomem`**
 
 ```bash
 sudo usermod -aG gpio $USER
-# puis se déconnecter/reconnecter
+# then log out and back in
 ```
 
-**Erreur de mémoire lors du `make`**
+**Out of memory during `make`**
 
 ```bash
-make -j2  # réduire le parallélisme
+make -j2  # reduce parallelism
 ```
 
-**CMake ne trouve pas ExecuTorch**
+**CMake cannot find ExecuTorch**
 
-S'assurer que le dossier `executorch/` buildé est bien présent dans `app_code/` — le `cMakeLists.txt` l'intègre via `add_subdirectory(executorch EXCLUDE_FROM_ALL)`.
+Make sure the built `executorch/` directory is present inside `app_code/` — `cMakeLists.txt` includes it via `add_subdirectory(executorch EXCLUDE_FROM_ALL)`.
 
 ---
 
-## Licence
+## License
 
-Ce projet est distribué sous licence **MIT**. Voir le fichier [LICENSE](LICENSE) pour les détails.
+This project is distributed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
 Copyright (c) 2025 MamoudouSD
