@@ -4,20 +4,30 @@
 #include <stdint.h>
 #include <opencv2/opencv.hpp>
 
-
-//#define GPFSEL0_V   (uint32_t)0x36DB6000
+/*
+ * Summary:
+ * GPIO register configuration values used for display pin setup.
+ *
+ * Parameters:
+ * - None
+ *
+ * Returns:
+ * - Not applicable
+ */
 #define GPFSEL0_V   (uint32_t)0x9249000
-
-//#define GPFSEL1_v     (uint32_t)0x36DB6DB6
 #define GPFSEL1_v     (uint32_t)0x9249249
-
 #define GPFSEL2_v     (uint32_t)0x249
 
-
-
-
-
-
+/*
+ * Summary:
+ * Display dimensions and color constants.
+ *
+ * Parameters:
+ * - None
+ *
+ * Returns:
+ * - Not applicable
+ */
 #define LCD_WIDTH 240
 #define LCD_HEIGHT 320
 #define BLACK 0x0000
@@ -25,6 +35,17 @@
 #define RED 0xF800
 #define GREEN 0x07E0
 #define BLUE 0x001F
+
+/*
+ * Summary:
+ * Display command constants.
+ *
+ * Parameters:
+ * - None
+ *
+ * Returns:
+ * - Not applicable
+ */
 #define CMD_MEMWRITE ((uint32_t)0x002C)
 #define CMD_SOFTRESET ((uint32_t)0x0001)
 #define CMD_SLEEPOUT ((uint32_t)0x0011)
@@ -55,14 +76,104 @@
 #define CMD_INTERFMODECTRL ((uint32_t)0x00B0)
 #define PARAM_INTERFMODECTRL ((uint32_t)0x0080)
 
+/*
+ * Summary:
+ * Initialize GPIO memory mapping.
+ *
+ * Parameters:
+ * - No parameters.
+ *
+ * Returns:
+ * - bool: true if GPIO memory mapping succeeds, false otherwise.
+ */
 bool gpio_map_init();
+
+/*
+ * Summary:
+ * Close GPIO memory mapping.
+ *
+ * Parameters:
+ * - No parameters.
+ *
+ * Returns:
+ * - No return value.
+ */
 void gpio_map_close();
+
+/*
+ * Summary:
+ * Configure GPIO pins for display communication.
+ *
+ * Parameters:
+ * - No parameters.
+ *
+ * Returns:
+ * - No return value.
+ */
 void gpio_init();
+
+/*
+ * Summary:
+ * Send a command and its associated data to the display.
+ *
+ * Parameters:
+ * - cmd (uint32_t): display command.
+ * - data (uint32_t*): pointer to command data buffer.
+ * - length (int): number of data values to send.
+ *
+ * Returns:
+ * - No return value.
+ */
 void send_configData(uint32_t cmd, uint32_t *data, int length);
+
+/*
+ * Summary:
+ * Initialize display controller.
+ *
+ * Parameters:
+ * - No parameters.
+ *
+ * Returns:
+ * - No return value.
+ */
 void display_init();
+
+/*
+ * Summary:
+ * Fill the active display area with one color.
+ *
+ * Parameters:
+ * - color (uint32_t): color value to write.
+ *
+ * Returns:
+ * - No return value.
+ */
 void fill_color(uint32_t color);
+
+/*
+ * Summary:
+ * Fill the two display regions with two colors.
+ *
+ * Parameters:
+ * - color1 (uint32_t): color for first region.
+ * - color2 (uint32_t): color for second region.
+ *
+ * Returns:
+ * - No return value.
+ */
 void fill_screen(uint32_t color1, uint32_t color2);
 
+/*
+ * Summary:
+ * Display an OpenCV image in the selected screen region.
+ *
+ * Parameters:
+ * - image (cv::Mat): image to display.
+ * - part (int): target screen region.
+ *
+ * Returns:
+ * - No return value.
+ */
 void fill_image(cv::Mat image, int part);
 #endif
 

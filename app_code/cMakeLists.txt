@@ -1,22 +1,40 @@
+# Minimum required CMake version
 cmake_minimum_required(VERSION 3.28)
 
-project(Car_identification_OCR)
+# Project name
+project(Car_Plate_identification)
 
-# Set the C++ standard to C++17
-set(CMAKE_CXX_STANDARD 17)
+# Set the C++ standard to C++20
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(sources cpp_file/main.cpp cpp_file/Ai.cpp cpp_file/Camera.cpp cpp_file/Display.cpp cpp_file/Image.cpp cpp_file/Notification.cpp cpp_file/Yolo_infer.cpp cpp_file/System.cpp)#indiquer les fichiers .cpp
-
-
-
-add_executable(Car_identification_OCR ${sources})
-
+# Find OpenCV package and system thread library (pthread)
 find_package(OpenCV REQUIRED)
-find_package(Torch REQUIRED)
+find_package(Threads REQUIRED)
 
-target_include_directories(Car_identification_OCR PRIVATE hpp_file ${OpenCV_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS})
+# Add executorch as subdirectory but exclude it from default build
+add_subdirectory(executorch EXCLUDE_FROM_ALL)
 
-target_link_libraries(Car_identification_OCR ${OpenCV_LIBS} ${TORCH_LIBRARIES})
+# List of source files for the executable
+set(SOURCES cpp_file/main.cpp cpp_file/Display.cpp cpp_file/Notification.cpp
+    cpp_file/Camera.cpp cpp_file/Image.cpp cpp_file/Yolo_infer.cpp cpp_file/System.cpp)
 
+# Create the main executable
+add_executable(Car_Plate_identification ${SOURCES})
+
+# Include directories used only by this target
+target_include_directories(Car_Plate_identification PRIVATE 
+    hpp_file 
+    ${OpenCV_INCLUDE_DIRS})
+
+# Link required libraries to the executable
+target_link_libraries(Car_Plate_identification PRIVATE
+    executorch                # main executorch library
+    executorch::backends      # executorch backends (xnnpack, etc.)
+    executorch::extensions    # executorch extensions
+    executorch::kernels       # executorch kernels
+    ${OpenCV_LIBS}            # OpenCV libraries
+    Threads::Threads          # threading support (pthread)
+    rt                        # realtime library (timers, clock, etc.)
+)
 

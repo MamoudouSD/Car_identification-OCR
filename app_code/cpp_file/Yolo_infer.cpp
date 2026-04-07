@@ -1,16 +1,41 @@
 #include "Yolo_infer.hpp"
 #include "Notification.hpp"
+#include "Ai.hpp"
+#include <opencv2/opencv.hpp>
 #include <executorch/extension/module/module.h>
 #include <executorch/extension/tensor/tensor.h>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
 
-Yolo_infer::Yolo_infer(std::string path, Notification* n, float scoreThreshold, float nmsThreshold): Ai(path, n){
+/*
+ * Summary:
+ * Initialize YOLO inference object with thresholds.
+ *
+ * Parameters:
+ * - path (std::string): model file path
+ * - n (Notification*): notification handler
+ * - scoreThreshold (float): detection confidence threshold
+ * - nmsThreshold (float): NMS suppression threshold
+ *
+ * Returns:
+ * - No return value.
+ */
+Yolo_infer::Yolo_infer(std::string path, Notification* n, float scoreThreshold, float nmsThreshold): Ai<std::vector<Detection>>(path, n){
     modelScoreThreshold = scoreThreshold;
     modelNMSThreshold = nmsThreshold;
 }
 
+/*
+ * Summary:
+ * Load YOLO model into executorch runtime.
+ *
+ * Parameters:
+ * - No parameters.
+ *
+ * Returns:
+ * - bool: true if model loaded successfully, false otherwise.
+ */
 bool Yolo_infer::load_model(){
     module = new executorch::extension::Module(model_path);
     auto r = module->load();
@@ -18,11 +43,24 @@ bool Yolo_infer::load_model(){
         notif->notice_err("Yolo loading failed: model load failed!");
         return false;
     }else{
-        notif->notice_err("Yolo loading succed: model load!");
+        notif->notice_info("Yolo loading succed: model load!");
         return true;
     }
 }
 
+/*
+ * Summary:
+ * Convert OpenCV image to tensor for YOLO inference.
+ *
+ * Parameters:
+ * - img (cv::Mat&): input image
+ * - CHW_frame (cv::Mat&): blob output storage
+ * - unsqueeze (bool): optional unsqueeze flag (unused)
+ * - unsqueeze_dim (int): optional unsqueeze dimension (unused)
+ *
+ * Returns:
+ * - TensorPtr: tensor ready for inference
+ */
 executorch::extension::TensorPtr Yolo_infer::data_processing(cv::Mat& img, cv::Mat& CHW_frame, bool unsqueeze, int unsqueeze_dim){
     cv::Mat f32_img;
     img.convertTo(f32_img, CV_32FC3);
@@ -31,11 +69,31 @@ executorch::extension::TensorPtr Yolo_infer::data_processing(cv::Mat& img, cv::M
     return tensor_image;
 }
 
+/*
+ * Summary:
+ * Apply sigmoid function to logits score.
+ *
+ * Parameters:
+ * - logits (float): raw model output score
+ *
+ * Returns:
+ * - float: probability score
+ */
 float Yolo_infer::calcul_scores(float logits){
     float score = 1.0/(1.0+std::exp(-logits));
     return score;
 }
 
+/*
+ * Summary:
+ * Run YOLO inference and return detections.
+ *
+ * Parameters:
+ * - image (cv::Mat&): input image
+ *
+ * Returns:
+ * - std::vector<Detection>: detected bounding boxes and scores
+ */
 std::vector<Detection> Yolo_infer::ai_inference(cv::Mat& image){
     cv::Mat CHW_frame;
     std::vector <Detection> detections;
@@ -82,6 +140,16 @@ std::vector<Detection> Yolo_infer::ai_inference(cv::Mat& image){
     return detections;
 }
 
+/*
+ * Summary:
+ * Destroy YOLO module and free memory.
+ *
+ * Parameters:
+ * - No parameters.
+ *
+ * Returns:
+ * - No return value.
+ */
 Yolo_infer::~Yolo_infer(){
-    delete module
+    delete module;
 }

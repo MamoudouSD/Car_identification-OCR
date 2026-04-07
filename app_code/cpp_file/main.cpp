@@ -1,7 +1,20 @@
-#include "Display.hpp"
+#include <iostream>
+#include "System.hpp"
 int main(){
-    gpio_init();
-
-    display_init();
-    return 0;
+        bool result = system_init();
+        std::cout << "result: "<< result << "true: "<< true<<"\n";
+        if (result){
+                std::cout << "pour commencer cliquer sur s\n";
+                char s;
+                std::cin >>s;
+                if (s == 's'){
+                        result = start();
+                        if (result){
+                                result = system_end();
+                        }
+                        std::cout << "fin du programme\n";
+                }
+        }
+        return 1 ;
 }
+
