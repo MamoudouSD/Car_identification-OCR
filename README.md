@@ -7,6 +7,7 @@ Système embarqué temps-réel de **détection de plaques d'immatriculation** su
 ## 📋 Table des matières
 
 - [Architecture du système](#architecture-du-système)
+- [Analyse temps-réel — Rate Monotonic Analysis](#analyse-temps-réel--rate-monotonic-analysis)
 - [Structure du projet](#structure-du-projet)
 - [Prérequis](#prérequis)
 - [Installation de l'environnement](#installation-de-lenvironnement)
@@ -30,7 +31,7 @@ Système embarqué temps-réel de **détection de plaques d'immatriculation** su
 
 ## Architecture du système
 
-Le système repose sur un pipeline **multi-thread** piloté par un séquenceur temps-réel (timer POSIX SIGALRM, tick à 5 ms). Chaque tâche s'exécute sur un cœur CPU dédié avec une priorité temps-réel `SCHED_RR`.
+Le système repose sur un pipeline **multi-thread** piloté par un séquenceur temps-réel (timer POSIX SIGALRM, tick à 5 ms). Chaque tâche s'exécute sur un cœur CPU dédié avec une priorité temps-réel `SCHED_FIFO`.
 
 ```
 ┌─────────────┐     ┌──────────────────────────────────────────────────────┐
@@ -58,6 +59,61 @@ Le système repose sur un pipeline **multi-thread** piloté par un séquenceur t
 - Toutes les **48 ticks (240 ms)** → capture caméra 1 + caméra 2
 - Toutes les **35 ticks (175 ms)** → affichage écran + sauvegarde
 - Toutes les **70 ticks (350 ms)** → inférence IA
+
+---
+
+## Analyse temps-réel — Rate Monotonic Analysis
+
+Les priorités des tâches sont déterminées par **Rate Monotonic Analysis (RMA)** : plus la période est courte, plus la priorité est haute. Chaque tâche est épinglée sur un cœur dédié (`pthread_setaffinity_np`) avec une politique d'ordonnancement `SCHED_FIFO`.
+
+**Affectation des tâches aux cœurs :**
+
+| Tâche | Cœur CPU | Priorité SCHED_RR |
+|-------|----------|-------------------|
+| Cam1 (capture caméra 1) | Cœur 1 (CPU 0) | 80 |
+| Display (affichage LCD) | Cœur 1 (CPU 0) | 60 |
+| Cam2 (capture caméra 2) | Cœur 2 (CPU 1) | 80 |
+| Save (sauvegarde) | Cœur 2 (CPU 1) | 60 |
+| AI (inférence YOLO) | Cœur 3 (CPU 2) | 90 |
+| Main / Séquenceur | Cœur 4 (CPU 3) | 89 |
+
+---
+
+### Tableaux RMA par cœur
+
+Les colonnes sont : **P** = période (ms), **F** = fréquence (Hz), **So** = nombre d'occurrences par tick, **Priority** = priorité RMA (1 = plus haute), **C** = temps d'exécution (ms), **U%** = taux d'utilisation CPU.
+
+> Le taux d'utilisation est calculé comme U = C / P × 100. La limite de faisabilité RMA pour n tâches est U ≤ n × (2^(1/n) − 1).
+
+**Cœur 1 — Cam1 + Display** (U total = 27.14%, limite RMA 2 tâches ≈ 82.8% ✅)
+
+| Tâche | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
+|-------|--------|--------|----|----------|--------|----|
+| T1 — Capture Cam1 | 240 | 4.17 | 1.36 | **1** | 62 | 26% |
+| T2 — Display | 175 | 5.71 | 1 | **2** | 2 | 1.14% |
+
+**Cœur 2 — Cam2 + Save** (U total = 29.43%, limite RMA 2 tâches ≈ 82.8% ✅)
+
+| Tâche | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
+|-------|--------|--------|----|----------|--------|----|
+| T1 — Capture Cam2 | 240 | 4.17 | 1.36 | **1** | 62 | 26% |
+| Tk — Save | 175 | 5.71 | 1 | **2** | 6 | 3.43% |
+
+**Cœur 3 — Inférence IA** (U = 91.14%, limite RMA 1 tâche = 100% ✅)
+
+| Tâche | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
+|-------|--------|--------|----|----------|--------|----|
+| T2 — AI Inference | 350 | 2.86 | 1 | **1** | 319 | 91.14% |
+
+> ⚠️ La tâche d'inférence est la plus coûteuse du système (319 ms sur 350 ms de période). Le cœur 3 est dédié exclusivement à cette tâche pour garantir son respect d'échéance.
+
+**Cœur 4 — Séquenceur / Main** (U = 40%, limite RMA 1 tâche = 100% ✅)
+
+| Tâche | P (ms) | F (Hz) | So | Priority | C (ms) | U% |
+|-------|--------|--------|----|----------|--------|----|
+| T2 — Séquenceur | 5 | 200 | 1 | **1** | 2 | 40% |
+
+> Le séquenceur tourne à 200 Hz (tick 5 ms) et orchestre toutes les autres tâches via des sémaphores binaires POSIX.
 
 ---
 
